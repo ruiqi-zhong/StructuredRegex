@@ -5,12 +5,17 @@ from regex_io import build_func_from_str, read_tsv_file
 from template import InfSeperatedField
 import subprocess
 import random
+
 # REGEX_TYPES = ["uns", "cat", "sep"]
 REGEX_TYPES = ["uns", "cat", "sep"]
 RAW_DIR = "regexes-raw"
 NUM_TRYIED = 100
 NUM_KEEP = 6
 NUM_EXS = 10
+EXTERNAL_DIR = "./external"
+if not os.path.exists(EXTERNAL_DIR):
+    EXTERNAL_DIR = "toolkit/external"
+
 
 def prepare_pos_examples():
     # regexes_by_type = [read_regex_file(join(RAW_DIR, t + ".txt")) for t in REGEX_TYPES]
@@ -24,17 +29,27 @@ def prepare_pos_examples():
         # examples = [gen_examples(x) for x in regexes]
         examples_lines = ["\t".join(x) for x in examples]
         with open(join(RAW_DIR, t + "-pos.txt"), "w") as f:
-            f.write("\n".join(examples_lines)) 
+            f.write("\n".join(examples_lines))
+
 
 def gen_random_examples(regex, num_keep=NUM_KEEP, num_gen=NUM_TRYIED):
     out = subprocess.check_output(
-        ['java', '-cp', './external/jars/datagen.jar:./external/lib/*', '-ea', 'datagen.Main', 'example',
-            str(num_gen), regex])
+        [
+            "java",
+            "-cp",
+            "./external/jars/datagen.jar:./external/lib/*",
+            "-ea",
+            "datagen.Main",
+            "example",
+            str(num_gen),
+            regex,
+        ]
+    )
     out = out.decode("utf-8")
     lines = out.split("\n")
     lines = lines[1:]
     lines = [x for x in lines if len(x)]
-    fields = [(x[1:-3],x[-1]) for x in lines]
+    fields = [(x[1:-3], x[-1]) for x in lines]
     pos_exs = [x for x in fields if x[1] == "+"]
     neg_exs = [x for x in fields if x[1] == "-"]
     random.shuffle(pos_exs)
@@ -44,26 +59,48 @@ def gen_random_examples(regex, num_keep=NUM_KEEP, num_gen=NUM_TRYIED):
     exs = pos_exs + neg_exs
     return exs
 
+
 def gen_pos_examples(regex, num_gen=NUM_TRYIED, is_spec=False):
     # try:
     if not is_spec:
         regex = regex.specification()
     print("Gen", regex)
     out = subprocess.check_output(
-        ['java', '-cp', './external/jars/datagen.jar:./external/lib/*', '-ea', 'datagen.Main', 'example',
-            str(num_gen), regex])
+        [
+            "java",
+            "-cp",
+            f"{EXTERNAL_DIR}/jars/datagen.jar:{EXTERNAL_DIR}/lib/*",
+            "-ea",
+            "datagen.Main",
+            "example",
+            str(num_gen),
+            regex,
+        ]
+    )
     out = out.decode("utf-8")
     return parse_examples(out)
+
 
 def match_spec_example(regex, example):
     # try:
     print("Match", regex, example)
+
     out = subprocess.check_output(
-        ['java', '-cp', './external/jars/datagen.jar:./external/lib/*', '-ea', 'datagen.Main', 'evaluate',
-            regex, example])
+        [
+            "java",
+            "-cp",
+            f"{EXTERNAL_DIR}/jars/datagen.jar:{EXTERNAL_DIR}/lib/*",
+            "-ea",
+            "datagen.Main",
+            "evaluate",
+            regex,
+            example,
+        ]
+    )
     out = out.decode("utf-8")
     out = out.rstrip()
     return out
+
 
 def gen_neg_examples(regex, num_keep=NUM_KEEP):
     # for a large number, random sample a path, gen a positive example
@@ -77,20 +114,31 @@ def gen_neg_examples(regex, num_keep=NUM_KEEP):
         exs.extend(over_exs[:num_keep])
     return exs
 
+
 def parse_examples(exs_out):
     lines = exs_out.split("\n")
     lines = lines[1:]
     lines = [x for x in lines if len(x)]
-    fields = [(x[1:-3],x[-1]) for x in lines]
+    fields = [(x[1:-3], x[-1]) for x in lines]
     fields = [x[0] for x in fields if x[1] == "+"]
     return fields
 
+
 def gen_examples_file(filename, regex):
     out = subprocess.check_output(
-        ['java', '-cp', './external/jars/datagen.jar:./external/lib/*', '-ea', 'datagen.Main', 'example',
-            str(NUM_TRYIED), regex])
+        [
+            "java",
+            "-cp",
+            f"{EXTERNAL_DIR}/jars/datagen.jar:{EXTERNAL_DIR}/lib/*",
+            "-ea",
+            "datagen.Main",
+            "example",
+            str(NUM_TRYIED),
+            regex,
+        ]
+    )
     exs_out = out.decode("utf-8")
-    
+
     lines = exs_out.split("\n")
     lines = lines[1:]
     lines = [x for x in lines if len(x)]
@@ -100,6 +148,7 @@ def gen_examples_file(filename, regex):
 
     with open(filename, "w") as f:
         f.write("\n".join(lines))
+
 
 def make_examples_file(filename, regex, pos_exs, neg_exs):
     pos_lines = pos_exs
@@ -122,6 +171,7 @@ def make_examples_file(filename, regex, pos_exs, neg_exs):
     with open(filename, "w") as f:
         f.write("\n".join(lines))
 
+
 # def prepare_data():
 #     regexes_by_type = [read_tsv_file(join(RAW_DIR, t + ".txt")) for t in REGEX_TYPES]
 #     regexes_by_type = [[build_func_from_str(x[0]) for x in regexes] for regexes in regexes_by_type]
@@ -141,7 +191,7 @@ def make_examples_file(filename, regex, pos_exs, neg_exs):
 #     with open("pilot.txt", "w") as f:
 #         for p in data_regexes:
 #             f.write(tok(p[0].logical_form()) + "\n")
-    
+
 #     with open("pilot-spec.txt", "w") as f:
 #         for p in data_regexes:
 #             f.write(p[0].specification() + "\n")
@@ -156,43 +206,54 @@ def make_examples_file(filename, regex, pos_exs, neg_exs):
 #             lines.append("{},{}".format(img_url, exs_str))
 #         f.write("\n".join(lines))
 
+
 def prepare_data():
     regexes_by_type = [read_tsv_file(join(RAW_DIR, t + ".txt")) for t in REGEX_TYPES]
-    regexes_by_type = [[build_func_from_str(x[0]) for x in regexes] for regexes in regexes_by_type]
+    regexes_by_type = [
+        [build_func_from_str(x[0]) for x in regexes] for regexes in regexes_by_type
+    ]
 
-    pos_examples_by_type = [read_tsv_file(join(RAW_DIR, t + "-pos.txt")) for t in REGEX_TYPES]
+    pos_examples_by_type = [
+        read_tsv_file(join(RAW_DIR, t + "-pos.txt")) for t in REGEX_TYPES
+    ]
     # neg_examples_by_type = [read_tsv_file(join(RAW_DIR, t + "-neg.txt")) for t in REGEX_TYPES]
     # tgt_num_by_type = [15, 15, 30]
     tgt_num_by_type = [50, 50, 50]
     data_regexes = []
-    for regexes, pos_exs, num_tgt in zip(regexes_by_type, pos_examples_by_type, tgt_num_by_type):
+    for regexes, pos_exs, num_tgt in zip(
+        regexes_by_type, pos_examples_by_type, tgt_num_by_type
+    ):
         reg_ex_pairs = list(zip(regexes, pos_exs))
-        print("Len before:",len(reg_ex_pairs))
+        print("Len before:", len(reg_ex_pairs))
         reg_ex_pairs = [x for x in reg_ex_pairs if len(x[1]) >= NUM_KEEP]
-        print("Len after:",len(reg_ex_pairs))
+        print("Len after:", len(reg_ex_pairs))
         data_regexes.extend(reg_ex_pairs[:num_tgt])
 
     with open("pilot.txt", "w") as f:
         for p in data_regexes:
             f.write(tok(p[0].logical_form()) + "\n")
-    
+
     with open("pilot.csv", "w") as f:
         lines = []
         lines.append("image_url,str_examples")
         for i, p in enumerate(data_regexes):
             img_url = '"http://taur.cs.utexas.edu/hidden/p/{}.png"'.format(i)
             random.shuffle(p[1])
-            exs_str = '"<ul>{}</ul>"'.format("".join(["<li>{}</li>".format(x) for x in p[1][:NUM_KEEP]]))
+            exs_str = '"<ul>{}</ul>"'.format(
+                "".join(["<li>{}</li>".format(x) for x in p[1][:NUM_KEEP]])
+            )
             lines.append("{},{}".format(img_url, exs_str))
         f.write("\n".join(lines))
+
 
 def io_test():
     for t in REGEX_TYPES:
         regexes = read_tsv_file(join(RAW_DIR, t + ".txt"))
-        
+
         examples = [build_func_from_str(x[0]).to_string() for x in regexes]
         with open(join(RAW_DIR, t + "-re.txt"), "w") as f:
             [f.write(r + "\n") for r in examples]
+
 
 def prepare_examples():
     for t in REGEX_TYPES:
@@ -202,12 +263,13 @@ def prepare_examples():
         # neg_examples = [gen_neg_examples(x) for x in regexes]
         # neg_examples_lines = ["\t".join(x) for x in neg_examples]
         # with open(join(RAW_DIR, t + "-neg.txt"), "w") as f:
-        #     f.write("\n".join(neg_examples_lines)) 
+        #     f.write("\n".join(neg_examples_lines))
 
         pos_examples = [gen_pos_examples(x) for x in regexes]
         pos_examples_lines = ["\t".join(x) for x in pos_examples]
         with open(join(RAW_DIR, t + "-pos.txt"), "w") as f:
-            f.write("\n".join(pos_examples_lines)) 
+            f.write("\n".join(pos_examples_lines))
+
 
 def read_example_file(filename):
     with open(filename) as f:
@@ -215,10 +277,11 @@ def read_example_file(filename):
         lines = [x.rstrip() for x in lines]
     lines = lines[1:-2]
     lines = [x for x in lines if len(x)]
-    fields = [(x[1:-3],x[-1]) for x in lines]
+    fields = [(x[1:-3], x[-1]) for x in lines]
     pos_exs = [x[0] for x in fields if x[1] == "+"]
     neg_exs = [x[0] for x in fields if x[1] == "-"]
     return pos_exs, neg_exs
+
 
 def compare_neg_examples():
 
@@ -229,7 +292,7 @@ def compare_neg_examples():
         old_fname = join("./benchmark-old", id)
         _, new_neg_exs = read_example_file(new_fname)
         _, old_neg_exs = read_example_file(old_fname)
-        
+
         div = HtmlElement("div")
         img_url = '"http://taur.cs.utexas.edu/hidden/p/{}.png"'.format(id)
         root.add_children(HtmlElement("p", [ImgElement(img_url)]))
@@ -237,7 +300,8 @@ def compare_neg_examples():
 
     with open("compare_neg.html", "w") as f:
         f.write(root.html())
-    
+
+
 def gen_hit_pos_exs(regex):
     hit_pos_exs = []
     if isinstance(regex, InfSeperatedField):
@@ -250,27 +314,30 @@ def gen_hit_pos_exs(regex):
                 print(spec_r, "Not Good")
     pos_exs = gen_pos_examples(regex)
     random.shuffle(pos_exs)
-    hit_pos_exs.extend(pos_exs[:(NUM_KEEP - len(hit_pos_exs))])
+    hit_pos_exs.extend(pos_exs[: (NUM_KEEP - len(hit_pos_exs))])
     return hit_pos_exs
+
 
 def gen_hit_neg_exs(regex):
     hit_neg_exs = gen_neg_examples(regex)
     random.shuffle(hit_neg_exs)
-    hit_neg_exs = hit_neg_exs[:(2*NUM_KEEP)]
+    hit_neg_exs = hit_neg_exs[: (2 * NUM_KEEP)]
     spec = regex.specification()
     match_results = [match_spec_example(spec, x) for x in hit_neg_exs]
     hit_neg_exs = [x[0] for x in zip(hit_neg_exs, match_results) if x[1] == "false"]
     return hit_neg_exs[:NUM_KEEP]
+
 
 def prepare_hit_fields(name, regex):
     # id, img_url, pos_exs, neg_exs
     id = name
     img_url = "http://taur.cs.utexas.edu/hidden/p/{}.png".format(id)
     pos_exs = gen_hit_pos_exs(regex)
-    pos_exs = '<ul>{}</ul>'.format("".join(["<li>{}</li>".format(x) for x in pos_exs]))
+    pos_exs = "<ul>{}</ul>".format("".join(["<li>{}</li>".format(x) for x in pos_exs]))
     neg_exs = gen_hit_neg_exs(regex)
-    neg_exs = '<ul>{}</ul>'.format("".join(["<li>{}</li>".format(x) for x in neg_exs]))
+    neg_exs = "<ul>{}</ul>".format("".join(["<li>{}</li>".format(x) for x in neg_exs]))
     return (id, img_url, pos_exs, neg_exs)
+
 
 def prepare_hits():
     batch_id = 3
@@ -282,7 +349,9 @@ def prepare_hits():
         regexes = read_tsv_file(join(RAW_DIR, "batch{}_{}.txt".format(batch_id, t)))
         regexes = [build_func_from_str(x[0]) for x in regexes]
         regexes = regexes[:num_tgt]
-        regexes = [("b-{}_t-{}_id-{}".format(batch_id, t, i), x) for i, x in enumerate(regexes)]
+        regexes = [
+            ("b-{}_t-{}_id-{}".format(batch_id, t, i), x) for i, x in enumerate(regexes)
+        ]
         named_regexes.extend(regexes)
 
     with open("batch-{}-record.txt".format(batch_id), "w") as f:
@@ -292,7 +361,7 @@ def prepare_hits():
     with open("batch-{}.txt".format(batch_id), "w") as f:
         for name, r in named_regexes:
             f.write("{} {}\n".format(name, tok(r.logical_form())))
-    
+
     # prepare batch.csv
     # id, img_url, pos_exs, neg_exs
     csv_fields = []
@@ -303,10 +372,10 @@ def prepare_hits():
     csv_lines = []
     csv_lines.append("id,img_url,pos_exs,neg_exs\n")
     for id, img_url, pos_exs, neg_exs in csv_fields:
-        csv_lines.append('"{}","{}","{}","{}"\n'.format(id,img_url,pos_exs,neg_exs))
+        csv_lines.append('"{}","{}","{}","{}"\n'.format(id, img_url, pos_exs, neg_exs))
     with open("batch-{}.csv".format(batch_id), "w") as f:
         f.writelines(csv_lines)
-    
+
     # preview
     root = HtmlElement("html")
     for id, img_url, pos_exs, neg_exs in csv_fields:
@@ -321,13 +390,14 @@ def prepare_hits():
 
     with open("preview_dataset.html", "w") as f:
         f.write(root.html())
-    
+
 
 def main():
     # prepare_examples()
     # prepare_data()
     # compare_neg_examples()
     prepare_hits()
+
 
 if __name__ == "__main__":
     random.seed(123)
